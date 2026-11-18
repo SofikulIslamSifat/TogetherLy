@@ -1,0 +1,42 @@
+{
+  "expo": {
+    "name": "Togetherly",
+    "slug": "togetherly",
+    "scheme": "togetherly",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "newArchEnabled": true,
+    "android": {
+      "package": "com.togetherly.app",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#FFF9F5"
+      },
+      "versionCode": 1
+    },
+    "ios": {
+      "supportsTablet": true
+    },
+    "plugins": [
+      "expo-router",
+      "expo-sqlite",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Togetherly uses your photo library so you can add memories to your shared space.",
+          "microphonePermission": false
+        }
+      ]
+    ],
+    "experiments": {
+      "typedRoutes": true
+    },
+    "icon": "./assets/icon.png",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#FFF9F5"
+    }
+  }
+}
