@@ -1,4 +1,5 @@
 import type { ImagePickerAsset } from 'expo-image-picker';
+import { decode } from 'base64-arraybuffer';
 import { supabase } from '@/lib/supabase';
 
 export const MEMORY_CATEGORIES = ['Everyday', 'Travel', 'Celebration', 'Food', 'Milestone', 'Other'] as const;
@@ -24,18 +25,46 @@ function makeUuid() {
   });
 }
 
-function imageDetails(asset: ImagePickerAsset) {
-  const mimeType = asset.mimeType?.toLowerCase();
-  const extensionByMime: Record<string, string> = {
-    'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp', 'image/heic': 'heic',
-  };
-  if (!mimeType || !extensionByMime[mimeType]) {
-    throw new Error('Please choose a JPEG, PNG, WebP or HEIC photo.');
-  }
-  if (asset.fileSize && asset.fileSize > 10 * 1024 * 1024) {
+const maxMemoryPhotoSize = 10 * 1024 * 1024;
+const extensionByMime: Record<string, string> = {
+  'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp', 'image/heic': 'heic',
+};
+const mimeByExtension: Record<string, string> = {
+  jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png', webp: 'image/webp', heic: 'image/heic',
+};
+
+function getSupportedMimeType(mimeType: string | null | undefined, fileName: string | null | undefined) {
+  const normalizedMimeType = mimeType?.split(';', 1)[0].trim().toLowerCase();
+  const canonicalMimeType = normalizedMimeType === 'image/jpg' ? 'image/jpeg' : normalizedMimeType;
+  if (canonicalMimeType && extensionByMime[canonicalMimeType]) return canonicalMimeType;
+
+  const extension = fileName?.match(/\.([a-z0-9]+)$/i)?.[1]?.toLowerCase();
+  const inferredMimeType = extension ? mimeByExtension[extension] : undefined;
+  if (!inferredMimeType) throw new Error('Please choose a JPEG, PNG, WebP or HEIC photo.');
+  return inferredMimeType;
+}
+
+export async function prepareMemoryImageUpload(asset: ImagePickerAsset) {
+  if (asset.fileSize != null && asset.fileSize > maxMemoryPhotoSize) {
     throw new Error('Choose a photo smaller than 10 MB.');
   }
-  return { mimeType, extension: extensionByMime[mimeType] };
+
+  let data: ArrayBuffer;
+  let mimeType: string;
+  if (asset.file) {
+    mimeType = getSupportedMimeType(asset.file.type || asset.mimeType, asset.file.name || asset.fileName);
+    data = await asset.file.arrayBuffer();
+  } else {
+    if (!asset.base64) throw new Error('The selected photo could not be read. Please choose it again.');
+    // Expo's native image picker encodes its base64 output as JPEG.
+    mimeType = 'image/jpeg';
+    data = decode(asset.base64);
+  }
+
+  if (data.byteLength > maxMemoryPhotoSize) {
+    throw new Error('Choose a photo smaller than 10 MB.');
+  }
+  return { data, mimeType, extension: extensionByMime[mimeType] };
 }
 
 export async function getMemories(spaceId: string): Promise<SharedMemory[]> {
@@ -53,19 +82,15 @@ export async function getMemories(spaceId: string): Promise<SharedMemory[]> {
 export async function createMemory(input: {
   spaceId: string; caption: string; memoryDate: string; category: MemoryCategory; asset: ImagePickerAsset;
 }) {
-  const { mimeType, extension } = imageDetails(input.asset);
-  const id = makeUuid();
-  const storagePath = `${input.spaceId}/${id}/${Date.now()}.${extension}`;
   const { data: userResult, error: userError } = await supabase.auth.getUser();
   if (userError) throw userError;
   if (!userResult.user) throw new Error('Sign in again to add a memory.');
 
-  const response = await fetch(input.asset.uri);
-  if (!response.ok) throw new Error('The selected photo could not be read.');
-  const fileBlob = await response.blob();
-  if (fileBlob.size > 10 * 1024 * 1024) throw new Error('Choose a photo smaller than 10 MB.');
+  const { data, mimeType, extension } = await prepareMemoryImageUpload(input.asset);
+  const id = makeUuid();
+  const storagePath = `${input.spaceId}/${id}/${Date.now()}.${extension}`;
   const { error: uploadError } = await supabase.storage.from('shared-memories')
-    .upload(storagePath, fileBlob, { contentType: mimeType, upsert: false });
+    .upload(storagePath, data, { contentType: mimeType, upsert: false });
   if (uploadError) throw uploadError;
 
   const { error: rowError } = await supabase.from('memories').insert({

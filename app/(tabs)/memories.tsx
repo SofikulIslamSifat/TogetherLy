@@ -69,7 +69,7 @@ export default function MemoriesScreen() {
         return;
       }
       const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ['images'], allowsEditing: true, aspect: [4, 3], quality: 0.85,
+        mediaTypes: ['images'], allowsEditing: true, aspect: [4, 3], quality: 0.85, base64: true,
       });
       if (result.canceled || !result.assets[0]) return;
       setSelectedAsset(result.assets[0]);
