@@ -55,7 +55,7 @@ export default function ResetPasswordScreen() {
     } finally { setSubmitting(false); }
   };
 
-  return <Screen contentContainerStyle={styles.content}>
+  return <Screen maxContentWidth={520} contentContainerStyle={styles.content}>
     <Text style={styles.title}>Choose a new password</Text>
     <Text style={styles.subtitle}>{sessionReady ? 'Enter a new password for your account.' : 'Open the password reset link from your email on this device to continue.'}</Text>
     {sessionReady ? <View style={styles.form}><Controller control={control} name="password" render={({ field: { onChange, onBlur, value } }) => <FormField label="New password" placeholder="At least 8 characters" secureTextEntry value={value} onChangeText={onChange} onBlur={onBlur} error={errors.password?.message} />} /><AppButton title="Update password" loading={submitting} onPress={handleSubmit(submit)} /></View> : null}

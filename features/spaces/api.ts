@@ -1,5 +1,34 @@
 import { supabase } from '@/lib/supabase';
 
+export function getApiErrorMessage(error: unknown, fallback: string): string {
+  if (error instanceof Error && error.message) return error.message;
+  if (typeof error === 'object' && error !== null) {
+    if ('message' in error && typeof error.message === 'string' && error.message) return error.message;
+    if ('details' in error && typeof error.details === 'string' && error.details) return error.details;
+    if ('hint' in error && typeof error.hint === 'string' && error.hint) return error.hint;
+  }
+  return fallback;
+}
+
+async function ensureCurrentUserProfile(): Promise<void> {
+  const { data, error } = await supabase.auth.getUser();
+  if (error) throw error;
+  if (!data.user) throw new Error('Sign in before creating a space.');
+
+  const metadataName = data.user.user_metadata?.display_name;
+  const displayName =
+    typeof metadataName === 'string' && metadataName.trim().length >= 2
+      ? metadataName.trim().slice(0, 60)
+      : 'Togetherly member';
+  const { error: profileError } = await supabase
+    .from('profiles')
+    .upsert(
+      { id: data.user.id, display_name: displayName },
+      { onConflict: 'id', ignoreDuplicates: true },
+    );
+  if (profileError) throw profileError;
+}
+
 export type SpaceMember = {
   user_id: string;
   role: 'owner' | 'member';
@@ -42,22 +71,23 @@ export async function getMySpace(): Promise<TogetherlySpace | null> {
 }
 
 export async function createSpace(name: string): Promise<string> {
+  await ensureCurrentUserProfile();
   const { data, error } = await supabase.rpc('create_space', { p_name: name.trim() });
-  if (error) throw error;
+  if (error) throw new Error(getApiErrorMessage(error, 'The space could not be created.'));
   if (!data) throw new Error('The space could not be created.');
   return data as string;
 }
 
 export async function createSpaceInvitation(spaceId: string): Promise<string> {
   const { data, error } = await supabase.rpc('create_space_invitation', { p_space_id: spaceId });
-  if (error) throw error;
+  if (error) throw new Error(getApiErrorMessage(error, 'The invitation could not be created.'));
   if (!data) throw new Error('The invitation could not be created.');
   return data as string;
 }
 
 export async function acceptSpaceInvitation(token: string): Promise<string> {
   const { data, error } = await supabase.rpc('accept_space_invitation', { p_token: token.trim().toLowerCase() });
-  if (error) throw error;
+  if (error) throw new Error(getApiErrorMessage(error, 'The invitation could not be accepted.'));
   if (!data) throw new Error('The invitation could not be accepted.');
   return data as string;
 }

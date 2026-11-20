@@ -154,7 +154,7 @@ export default function MemoriesScreen() {
         <View style={styles.gallery}>
           {memoriesQuery.data?.map((memory) => (
             <View key={memory.id} style={styles.memoryCard}>
-              <Image source={{ uri: memory.signed_url }} style={styles.memoryImage} resizeMode="cover" />
+              <Image source={{ uri: memory.signed_url }} style={styles.memoryImage} resizeMode="contain" />
               <View style={styles.memoryBody}>
                 <View style={styles.memoryMetaRow}>
                   <Text style={styles.categoryTag}>{memory.category}</Text>
@@ -183,7 +183,7 @@ export default function MemoriesScreen() {
               <View><Text style={styles.modalTitle}>{editingMemory ? 'Edit memory' : 'New memory'}</Text><Text style={styles.modalSubtitle}>{editingMemory ? 'Update the details for this moment.' : 'Add a caption and a date for your photo.'}</Text></View>
               <Pressable accessibilityRole="button" accessibilityLabel="Close" onPress={closeModal} style={styles.closeButton}><X color={colors.muted} size={21} /></Pressable>
             </View>
-            {selectedAsset ? <Image source={{ uri: selectedAsset.uri }} style={styles.previewImage} resizeMode="cover" /> : editingMemory ? <Image source={{ uri: editingMemory.signed_url }} style={styles.previewImage} resizeMode="cover" /> : null}
+            {selectedAsset ? <Image source={{ uri: selectedAsset.uri }} style={styles.previewImage} resizeMode="contain" /> : editingMemory ? <Image source={{ uri: editingMemory.signed_url }} style={styles.previewImage} resizeMode="contain" /> : null}
             <Text style={styles.fieldLabel}>Caption</Text>
             <TextInput value={caption} onChangeText={setCaption} placeholder="Write a little about this moment…" placeholderTextColor="#A99DA1" multiline maxLength={500} style={[styles.input, styles.captionInput]} />
             <Text style={styles.fieldLabel}>Date (YYYY-MM-DD)</Text>
@@ -219,8 +219,8 @@ const styles = StyleSheet.create({
   emptyCard: { backgroundColor: colors.card, borderRadius: radius.lg, padding: 24, alignItems: 'center', gap: 13, borderWidth: 1, borderColor: colors.border, marginTop: 8 },
   emptyIcon: { width: 62, height: 62, borderRadius: 22, backgroundColor: colors.secondaryBackground, alignItems: 'center', justifyContent: 'center' },
   emptyTitle: { color: colors.text, fontWeight: '800', fontSize: 18, textAlign: 'center' },
-  gallery: { gap: 18 },
-  memoryCard: { backgroundColor: colors.card, borderRadius: radius.lg, overflow: 'hidden', borderWidth: 1, borderColor: colors.border },
+  gallery: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', rowGap: 18 },
+  memoryCard: { width: '49%', backgroundColor: colors.card, borderRadius: radius.lg, overflow: 'hidden', borderWidth: 1, borderColor: colors.border },
   memoryImage: { width: '100%', aspectRatio: 4 / 3, backgroundColor: colors.secondaryBackground },
   memoryBody: { padding: 15, gap: 10 },
   memoryMetaRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10 },

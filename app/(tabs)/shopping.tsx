@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import {
+  AppState,
   Alert,
   Pressable,
   ScrollView,
@@ -14,6 +15,7 @@ import { AppButton } from '@/components/common/AppButton';
 import { StateView } from '@/components/common/StateView';
 import { colors, radius } from '@/constants/theme';
 import { useAuth } from '@/features/auth/AuthProvider';
+import { getApiErrorMessage } from '@/features/spaces/api';
 import { useSpace } from '@/features/spaces/useSpace';
 import { useShopping } from '@/features/spaces/useShopping';
 import {
@@ -21,22 +23,30 @@ import {
   archiveShoppingList,
   createShoppingList,
   deleteShoppingItem,
+  getIncompleteShoppingLists,
+  getLocalShoppingDate,
   setShoppingItemPurchased,
   updateShoppingItemActualPrice,
   type ShoppingCategory,
   type ShoppingItem,
+  type ShoppingList,
 } from '@/features/spaces/shopping';
 
 const categories: ShoppingCategory[] = ['Produce', 'Dairy', 'Bakery', 'Pantry', 'Meat & Fish', 'Household', 'Personal care', 'Other'];
+const emptyLists: ShoppingList[] = [];
 const money = (value: number | null) => value == null ? '—' : `৳${value.toLocaleString('en-BD', { maximumFractionDigits: 2 })}`;
 
 export default function ShoppingScreen() {
   const { user } = useAuth();
   const { data: space } = useSpace(Boolean(user));
   const shopping = useShopping(space?.id);
-  const lists = shopping.data ?? [];
+  const lists = shopping.data ?? emptyLists;
+  const [today, setToday] = useState(getLocalShoppingDate);
+  const [view, setView] = useState<'today' | 'incomplete'>('today');
+  const todayLists = useMemo(() => lists.filter((list) => list.list_date === today), [lists, today]);
+  const incompleteLists = useMemo(() => getIncompleteShoppingLists(lists, today), [lists, today]);
   const [activeListId, setActiveListId] = useState<string | null>(null);
-  const activeList = lists.find((list) => list.id === activeListId) ?? lists[0] ?? null;
+  const activeList = todayLists.find((list) => list.id === activeListId) ?? todayLists[0] ?? null;
   const [newListTitle, setNewListTitle] = useState('');
   const [showNewList, setShowNewList] = useState(false);
   const [itemName, setItemName] = useState('');
@@ -48,6 +58,25 @@ export default function ShoppingScreen() {
   const [error, setError] = useState('');
   const [editingPriceId, setEditingPriceId] = useState<string | null>(null);
   const [actualPrice, setActualPrice] = useState('');
+
+  React.useEffect(() => {
+    let timer: ReturnType<typeof setTimeout>;
+    const syncDate = () => {
+      clearTimeout(timer);
+      setToday(getLocalShoppingDate());
+      const now = new Date();
+      const nextDay = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, 0, 0, 1);
+      timer = setTimeout(syncDate, nextDay.getTime() - now.getTime());
+    };
+    const subscription = AppState.addEventListener('change', (state) => {
+      if (state === 'active') syncDate();
+    });
+    syncDate();
+    return () => {
+      clearTimeout(timer);
+      subscription.remove();
+    };
+  }, []);
 
   const pendingItems = useMemo(() => activeList?.items.filter((item) => !item.is_purchased) ?? [], [activeList]);
   const purchasedItems = useMemo(() => activeList?.items.filter((item) => item.is_purchased) ?? [], [activeList]);
@@ -62,7 +91,7 @@ export default function ShoppingScreen() {
       success?.();
       await shopping.refetch();
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Something went wrong. Please try again.');
+      setError(getApiErrorMessage(e, 'Something went wrong. Please try again.'));
     } finally {
       setBusy(false);
     }
@@ -71,7 +100,7 @@ export default function ShoppingScreen() {
   const handleCreateList = () => {
     if (!space?.id || newListTitle.trim().length < 1) return;
     void runAction(async () => {
-      const id = await createShoppingList(space.id, newListTitle);
+      const id = await createShoppingList(space.id, newListTitle, today);
       setActiveListId(id);
     }, () => { setNewListTitle(''); setShowNewList(false); });
   };
@@ -123,25 +152,34 @@ export default function ShoppingScreen() {
       <View style={styles.headerIcon}><ShoppingBasket color={colors.primaryPressed} size={22} /></View>
       <View style={{ flex: 1 }}>
         <Text style={styles.title}>Shopping</Text>
-        <Text style={styles.subtitle}>A shared list for everyday essentials</Text>
+        <Text style={styles.subtitle}>A fresh list each day, with unfinished items kept separate</Text>
       </View>
-      <Pressable accessibilityRole="button" accessibilityLabel={showNewList ? 'Close new list form' : 'Create a shopping list'} hitSlop={8} onPress={() => setShowNewList((value) => !value)} style={styles.addListButton}>
+      <Pressable accessibilityRole="button" accessibilityLabel={showNewList ? 'Close new list form' : 'Create a shopping list'} hitSlop={8} onPress={() => { setView('today'); setShowNewList((value) => !value); }} style={styles.addListButton}>
         <Plus size={19} color="#FFFFFF" />
       </Pressable>
     </View>
 
-    {showNewList ? <View style={styles.panel}>
-      <Text style={styles.panelTitle}>Create a shopping list</Text>
-      <TextInput value={newListTitle} onChangeText={setNewListTitle} placeholder="e.g. Weekly groceries" placeholderTextColor={colors.muted} style={styles.input} maxLength={80} />
+    <View style={styles.viewTabs}>
+      <Pressable accessibilityRole="tab" accessibilityState={{ selected: view === 'today' }} onPress={() => setView('today')} style={[styles.viewTab, view === 'today' && styles.viewTabActive]}>
+        <Text style={[styles.viewTabText, view === 'today' && styles.viewTabTextActive]}>Today</Text>
+      </Pressable>
+      <Pressable accessibilityRole="tab" accessibilityState={{ selected: view === 'incomplete' }} onPress={() => setView('incomplete')} style={[styles.viewTab, view === 'incomplete' && styles.viewTabActive]}>
+        <Text style={[styles.viewTabText, view === 'incomplete' && styles.viewTabTextActive]}>Incomplete ({incompleteLists.reduce((count, list) => count + list.items.length, 0)})</Text>
+      </Pressable>
+    </View>
+
+    {showNewList && view === 'today' ? <View style={styles.panel}>
+      <Text style={styles.panelTitle}>Create today&apos;s shopping list</Text>
+      <TextInput value={newListTitle} onChangeText={setNewListTitle} placeholder="e.g. Today's groceries" placeholderTextColor={colors.muted} style={styles.input} maxLength={80} />
       <View style={styles.inlineActions}>
         <AppButton title="Cancel" variant="text" onPress={() => setShowNewList(false)} />
         <AppButton title="Create list" onPress={handleCreateList} loading={busy} disabled={!newListTitle.trim()} />
       </View>
     </View> : null}
 
-    {lists.length > 0 ? <>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.listChips}>
-        {lists.map((list) => <Pressable key={list.id} onPress={() => setActiveListId(list.id)} style={[styles.listChip, activeList?.id === list.id && styles.listChipActive]}>
+    {view === 'today' ? todayLists.length > 0 ? <>
+      <ScrollView horizontal style={styles.listChipsScroll} showsHorizontalScrollIndicator={false} contentContainerStyle={styles.listChips}>
+        {todayLists.map((list) => <Pressable key={list.id} onPress={() => setActiveListId(list.id)} style={[styles.listChip, activeList?.id === list.id && styles.listChipActive]}>
           <Text style={[styles.listChipText, activeList?.id === list.id && styles.listChipTextActive]}>{list.title}</Text>
         </Pressable>)}
       </ScrollView>
@@ -170,7 +208,7 @@ export default function ShoppingScreen() {
         </View>
 
         <View style={styles.sectionHeader}><Text style={styles.sectionTitle}>To buy</Text><Text style={styles.sectionCount}>{pendingItems.length}</Text></View>
-        {pendingItems.length ? pendingItems.map((item) => <ShoppingItemRow key={item.id} item={item} onToggle={() => handleTogglePurchased(item)} onDelete={() => confirmDelete(item)} onEditPrice={() => { setEditingPriceId(item.id); setActualPrice(item.actual_price == null ? '' : String(item.actual_price)); }} />) : <View style={styles.emptyCard}><Check size={20} color={colors.success} /><Text style={styles.emptyTitle}>You're all caught up</Text><Text style={styles.muted}>Add something above when you need it.</Text></View>}
+        {pendingItems.length ? pendingItems.map((item) => <ShoppingItemRow key={item.id} item={item} onToggle={() => handleTogglePurchased(item)} onDelete={() => confirmDelete(item)} onEditPrice={() => { setEditingPriceId(item.id); setActualPrice(item.actual_price == null ? '' : String(item.actual_price)); }} />) : <View style={styles.emptyCard}><Check size={20} color={colors.success} /><Text style={styles.emptyTitle}>You&apos;re all caught up</Text><Text style={styles.muted}>Add something above when you need it.</Text></View>}
 
         {purchasedItems.length ? <>
           <View style={styles.sectionHeader}><Text style={styles.sectionTitle}>Purchased</Text><Text style={styles.sectionCount}>{purchasedItems.length}</Text></View>
@@ -179,15 +217,21 @@ export default function ShoppingScreen() {
       </> : null}
     </> : <View style={styles.emptyState}>
       <View style={styles.emptyIcon}><ShoppingBasket size={27} color={colors.primaryPressed} /></View>
-      <Text style={styles.emptyTitle}>Start your first list</Text>
-      <Text style={styles.emptyCopy}>Create a shared shopping list and both members of your space can add items and mark purchases.</Text>
-      <AppButton title="Create a shopping list" onPress={() => setShowNewList(true)} />
-    </View>}
+      <Text style={styles.emptyTitle}>Start today&apos;s list</Text>
+      <Text style={styles.emptyCopy}>Create a shared list for today. Any items still unfinished tomorrow will appear in Incomplete.</Text>
+      <AppButton title="Create today&apos;s list" onPress={() => setShowNewList(true)} />
+    </View> : incompleteLists.length > 0 ? <>
+      <View style={styles.sectionHeader}><Text style={styles.sectionTitle}>Incomplete items</Text><Text style={styles.sectionCount}>{incompleteLists.reduce((count, list) => count + list.items.length, 0)}</Text></View>
+      {incompleteLists.map((list) => <View key={list.id} style={styles.incompleteGroup}>
+        <Text style={styles.incompleteListTitle}>{list.title}</Text>
+        {list.items.map((item) => <ShoppingItemRow key={item.id} item={item} onToggle={() => handleTogglePurchased(item)} onDelete={() => confirmDelete(item)} onEditPrice={() => { setEditingPriceId(item.id); setActualPrice(item.actual_price == null ? '' : String(item.actual_price)); }} />)}
+      </View>)}
+    </> : <View style={styles.emptyCard}><Check size={20} color={colors.success} /><Text style={styles.emptyTitle}>You&apos;re all caught up</Text><Text style={styles.muted}>Unfinished items from previous days will show up here.</Text></View>}
 
     {editingPriceId ? <View style={styles.priceEditor}>
       <Text style={styles.panelTitle}>Record actual price</Text>
       <TextInput value={actualPrice} onChangeText={setActualPrice} keyboardType="decimal-pad" placeholder="Actual price in ৳" placeholderTextColor={colors.muted} style={styles.input} />
-      <View style={styles.inlineActions}><AppButton title="Cancel" variant="text" onPress={() => setEditingPriceId(null)} /><AppButton title="Save price" onPress={() => { const item = activeList?.items.find((entry) => entry.id === editingPriceId); if (item) handleSaveActualPrice(item); }} loading={busy} /></View>
+      <View style={styles.inlineActions}><AppButton title="Cancel" variant="text" onPress={() => setEditingPriceId(null)} /><AppButton title="Save price" onPress={() => { const item = lists.flatMap((list) => list.items).find((entry) => entry.id === editingPriceId); if (item) handleSaveActualPrice(item); }} loading={busy} /></View>
     </View> : null}
     {error ? <Text style={styles.error}>{error}</Text> : null}
   </Screen>;
@@ -229,7 +273,13 @@ const styles = StyleSheet.create({
   categoryText: { color: colors.muted, fontSize: 11, fontWeight: '600' },
   categoryTextActive: { color: colors.text },
   inlineActions: { flexDirection: 'row', justifyContent: 'flex-end', alignItems: 'center', gap: 8 },
-  listChips: { gap: 8 },
+  listChipsScroll: { flexGrow: 0, flexShrink: 0 },
+  viewTabs: { flexDirection: 'row', gap: 8, padding: 4, borderRadius: radius.pill, backgroundColor: colors.secondaryBackground },
+  viewTab: { flex: 1, alignItems: 'center', paddingHorizontal: 12, paddingVertical: 10, borderRadius: radius.pill },
+  viewTabActive: { backgroundColor: '#FFFFFF' },
+  viewTabText: { color: colors.muted, fontSize: 12, fontWeight: '700' },
+  viewTabTextActive: { color: colors.text },
+  listChips: { gap: 8, alignItems: 'flex-start' },
   listChip: { borderRadius: 999, borderWidth: 1, borderColor: colors.border, backgroundColor: '#FFFFFF', paddingHorizontal: 15, paddingVertical: 10 },
   listChipActive: { backgroundColor: colors.secondaryBackground, borderColor: colors.primaryPressed },
   listChipText: { color: colors.muted, fontSize: 12, fontWeight: '700' },
@@ -260,6 +310,8 @@ const styles = StyleSheet.create({
   actualPrice: { color: colors.primaryPressed, fontSize: 10, fontWeight: '700' },
   deleteButton: { padding: 7 },
   emptyCard: { alignItems: 'center', gap: 7, backgroundColor: '#FFFFFF', borderRadius: radius.md, borderWidth: 1, borderColor: colors.border, padding: 22 },
+  incompleteGroup: { gap: 9 },
+  incompleteListTitle: { color: colors.text, fontSize: 13, fontWeight: '800' },
   emptyState: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFFFFF', borderRadius: radius.lg, borderWidth: 1, borderColor: colors.border, padding: 24, gap: 12, minHeight: 300 },
   emptyIcon: { width: 60, height: 60, borderRadius: 20, backgroundColor: colors.secondaryBackground, alignItems: 'center', justifyContent: 'center' },
   emptyTitle: { color: colors.text, fontSize: 16, fontWeight: '800' },

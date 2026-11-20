@@ -5,6 +5,7 @@ import { Screen } from '@/components/common/Screen';
 import { AppButton } from '@/components/common/AppButton';
 import { StateView } from '@/components/common/StateView';
 import { colors, radius } from '@/constants/theme';
+import { useIsDesktop } from '@/lib/responsive';
 import { useAuth } from '@/features/auth/AuthProvider';
 import { useSpace } from '@/features/spaces/useSpace';
 import { useTasks } from '@/features/spaces/useTasks';
@@ -16,6 +17,7 @@ const prettyDate = (value: string | null) => value ? new Date(`${value}T00:00:00
 
 export default function TasksScreen() {
   const { user } = useAuth();
+  const isDesktop = useIsDesktop();
   const { data: space } = useSpace(Boolean(user));
   const tasksQuery = useTasks(space?.id);
   const tasks = tasksQuery.data ?? [];
@@ -97,7 +99,7 @@ export default function TasksScreen() {
 
     <View style={styles.filters}>{(['Open', 'All', 'Done'] as const).map((value) => <ChoiceChip key={value} label={value} active={filter === value} onPress={() => setFilter(value)} />)}</View>
     {error && !showForm ? <Text style={styles.error}>{error}</Text> : null}
-    {visibleTasks.length ? visibleTasks.map((task) => <TaskCard key={task.id} task={task} assignee={memberName(task.assigned_to)} onToggle={() => runAction(() => setTaskCompleted(task.id, !task.is_completed))} onEdit={() => startEdit(task)} onDelete={() => confirmDelete(task)} />) : <StateView icon={<ClipboardList size={26} color={colors.primaryPressed} />} title={filter === 'Done' ? 'No completed tasks yet' : 'Nothing on the list'} description="Add a task and assign it to either member of your space." actionLabel="Create a task" onAction={() => setShowForm(true)} />}
+    {visibleTasks.length ? <View style={[styles.taskGrid, isDesktop && styles.taskGridDesktop]}>{visibleTasks.map((task) => <View key={task.id} style={[styles.taskColumn, isDesktop && styles.taskColumnDesktop]}><TaskCard task={task} assignee={memberName(task.assigned_to)} onToggle={() => runAction(() => setTaskCompleted(task.id, !task.is_completed))} onEdit={() => startEdit(task)} onDelete={() => confirmDelete(task)} /></View>)}</View> : <StateView icon={<ClipboardList size={26} color={colors.primaryPressed} />} title={filter === 'Done' ? 'No completed tasks yet' : 'Nothing on the list'} description="Add a task and assign it to either member of your space." actionLabel="Create a task" onAction={() => setShowForm(true)} />}
     {busy && !showForm ? <Text style={styles.muted}>Saving…</Text> : null}
   </Screen>;
 }
@@ -122,6 +124,7 @@ function TaskCard({ task, assignee, onToggle, onEdit, onDelete }: { task: Shared
 
 const styles = StyleSheet.create({
   content: { gap: 18 }, center: { flex: 1, justifyContent: 'center', alignItems: 'center', gap: 10 },
+  taskGrid: { gap: 12 }, taskGridDesktop: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' }, taskColumn: { width: '100%' }, taskColumnDesktop: { width: '49%' },
   header: { flexDirection: 'row', alignItems: 'center', gap: 12 }, headerIcon: { width: 46, height: 46, borderRadius: 15, backgroundColor: colors.secondaryBackground, alignItems: 'center', justifyContent: 'center' },
   title: { fontSize: 27, fontWeight: '800', color: colors.text }, subtitle: { color: colors.muted, fontSize: 13, marginTop: 2 }, addButton: { width: 42, height: 42, borderRadius: 14, backgroundColor: colors.primaryPressed, alignItems: 'center', justifyContent: 'center' },
   statsRow: { flexDirection: 'row', gap: 10 }, statCard: { flex: 1, backgroundColor: colors.card, borderRadius: radius.md, padding: 14, borderWidth: 1, borderColor: colors.border }, statNumber: { fontSize: 22, fontWeight: '800', color: colors.text }, statLabel: { color: colors.muted, fontSize: 12, marginTop: 2 },

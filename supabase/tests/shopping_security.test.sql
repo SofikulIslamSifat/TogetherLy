@@ -1,5 +1,5 @@
 begin;
-select plan(12);
+select plan(13);
 
 select has_table('public', 'shopping_lists', 'shopping_lists table exists');
 select has_table('public', 'shopping_items', 'shopping_items table exists');
@@ -12,6 +12,7 @@ select ok(
   'shopping_items has row level security enabled'
 );
 select has_column('public', 'shopping_lists', 'space_id', 'lists are scoped to a space');
+select has_column('public', 'shopping_lists', 'list_date', 'shopping lists are associated with a local calendar day');
 select has_column('public', 'shopping_items', 'list_id', 'items belong to a list');
 select has_column('public', 'shopping_items', 'estimated_price', 'items support estimated prices');
 select has_column('public', 'shopping_items', 'actual_price', 'items support actual prices');

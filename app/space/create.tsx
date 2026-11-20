@@ -5,7 +5,7 @@ import { Home } from 'lucide-react-native';
 import { Screen } from '@/components/common/Screen';
 import { AppButton } from '@/components/common/AppButton';
 import { FormField } from '@/components/common/FormField';
-import { createSpace } from '@/features/spaces/api';
+import { createSpace, getApiErrorMessage } from '@/features/spaces/api';
 import { spaceQueryKey } from '@/features/spaces/useSpace';
 import { queryClient } from '@/lib/query-client';
 import { colors } from '@/constants/theme';
@@ -18,10 +18,10 @@ export default function CreateSpaceScreen() {
     if (name.trim().length < 2 || name.trim().length > 50) { setError('Choose a name between 2 and 50 characters.'); return; }
     setBusy(true); setError('');
     try { await createSpace(name); await queryClient.invalidateQueries({ queryKey: spaceQueryKey }); router.replace('/(tabs)'); }
-    catch (e) { setError(e instanceof Error ? e.message : 'Could not create your space.'); }
+    catch (e) { setError(getApiErrorMessage(e, 'Could not create your space.')); }
     finally { setBusy(false); }
   };
-  return <Screen contentContainerStyle={styles.content}>
+  return <Screen maxContentWidth={620} contentContainerStyle={styles.content}>
     <AppButton title="Back" variant="text" onPress={() => router.back()} />
     <View style={styles.icon}><Home color={colors.primaryPressed} size={27} /></View>
     <Text style={styles.title}>Create your space</Text>

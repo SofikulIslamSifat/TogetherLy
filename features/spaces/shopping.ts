@@ -33,12 +33,27 @@ export type ShoppingList = {
   id: string;
   space_id: string;
   title: string;
+  list_date: string | null;
   created_by: string;
   created_at: string;
   updated_at: string;
   archived_at: string | null;
   items: ShoppingItem[];
 };
+
+export function getLocalShoppingDate(date = new Date()): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+export function getIncompleteShoppingLists(lists: ShoppingList[], today: string): ShoppingList[] {
+  return lists
+    .filter((list) => list.list_date !== today)
+    .map((list) => ({ ...list, items: list.items.filter((item) => !item.is_purchased) }))
+    .filter((list) => list.items.length > 0);
+}
 
 export async function getShoppingLists(spaceId: string): Promise<ShoppingList[]> {
   const { data: lists, error } = await supabase
@@ -65,10 +80,10 @@ export async function getShoppingLists(spaceId: string): Promise<ShoppingList[]>
   })) as ShoppingList[];
 }
 
-export async function createShoppingList(spaceId: string, title: string) {
+export async function createShoppingList(spaceId: string, title: string, listDate: string) {
   const { data, error } = await supabase
     .from('shopping_lists')
-    .insert({ space_id: spaceId, title: title.trim() })
+    .insert({ space_id: spaceId, title: title.trim(), list_date: listDate })
     .select('id')
     .single();
   if (error) throw error;

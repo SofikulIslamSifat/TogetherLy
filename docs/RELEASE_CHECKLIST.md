@@ -9,7 +9,7 @@ Use this checklist before distributing a tester APK or submitting an Android App
 - [ ] **Required:** Create a Supabase project for the intended environment.
 - [ ] **Required:** Set `EXPO_PUBLIC_SUPABASE_URL` and `EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY` locally and in the matching EAS environment.
 - [ ] Confirm no `.env`, secret key, service-role key, signing credential, or database password is committed.
-- [ ] Initialize EAS and set the real `expo.extra.eas.projectId` in `app.json`.
+- [ ] Confirm the EAS owner/project ID in `app.json` belongs to the intended account and configure the required EAS build environment.
 - [ ] Confirm `com.togetherly.app` is the intended permanent Android application ID.
 
 ## 2. Supabase deployment and security
@@ -20,7 +20,7 @@ Use this checklist before distributing a tester APK or submitting an Android App
 - [ ] Review Supabase Security Advisor findings and resolve relevant errors/warnings.
 - [ ] Confirm RLS is enabled and policies match the intended two-member access model.
 - [ ] Confirm private avatar and shared-memory buckets are private and Storage policies work for both members and outsiders.
-- [ ] Confirm Realtime publication and subscription behavior for shopping, meals, tasks, memories, and notifications.
+- [ ] Confirm Realtime publication and subscription behavior for shopping, meals, tasks, memories, and calendar events.
 - [ ] Confirm invitation expiry, single-use behavior, invalid-token handling, and the two-member limit.
 - [ ] Confirm email/password sign-in and email confirmation settings.
 - [ ] Add `togetherly://reset-password` to the Supabase Auth allowed redirect URLs.
@@ -37,10 +37,11 @@ Test with two separate accounts in the same shared space, plus a third account t
 - [ ] Create a space, generate an invitation, accept it from the second account, and verify a third account cannot access the space.
 - [ ] Verify a space cannot accept a third member.
 - [ ] Create, edit, purchase, and delete shopping items; verify both members see updates and totals.
+- [ ] Verify a new daily shopping list starts each day and unfinished items from prior days appear under Incomplete.
 - [ ] Create meal entries and ingredients; transfer ingredients to a shopping list and verify duplicates are not transferred twice.
 - [ ] Create, assign, edit, complete, reopen, filter, and delete tasks.
+- [ ] Add meals, tasks with due dates, plans, and annual important dates to the shared calendar; verify both members see changes in realtime.
 - [ ] Upload, view, edit, and delete memories; verify the other member can view them and a non-member cannot.
-- [ ] Generate activity notifications, mark one and all as read, and verify only the recipient can view/update them.
 - [ ] Test offline/poor-network behavior, retry states, empty states, and expired sessions.
 - [ ] Verify date/time display, BDT currency display, long text, keyboard behavior, and small-screen layouts.
 
@@ -57,7 +58,7 @@ Test with two separate accounts in the same shared space, plus a third account t
 
 ## 5. Play Store preparation
 
-- [ ] Prepare a public privacy policy URL that accurately describes account data, shared content, photos, notifications, and data deletion.
+- [ ] Prepare a public privacy policy URL that accurately describes account data, shared content, photos, and data deletion.
 - [ ] Prepare a support contact and a process for account/data deletion requests.
 - [ ] Prepare store title, short description, full description, screenshots, app icon, and feature graphic.
 - [ ] Complete the Play Console Data safety form based on actual SDK behavior and data handling; do not guess.
@@ -87,7 +88,7 @@ Do not distribute a production build until Supabase deployment, security review,
 
 - No Supabase project is linked to this source archive.
 - Database migrations and pgTAP tests have not been run against a live database.
-- EAS project ID and EAS environment variables must be configured by the project owner.
-- Dependencies are not installed in the build workspace; a generated npm lockfile is not included.
+- EAS build environment still requires project-owner setup.
+- The npm lockfile still needs review and inclusion in the release commit; install dependencies in the build workspace before building.
 - No EAS Android build or physical-device test has been performed.
-- Remote push notifications, privacy policy, support site, Play Store listing, and account-deletion workflow are not configured.
+- Privacy policy, support site, Play Store listing, and account-deletion workflow still require project-owner setup.

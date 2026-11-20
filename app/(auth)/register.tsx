@@ -13,7 +13,7 @@ export default function RegisterScreen() {
   const { signUp, configured } = useAuth(); const [submitting, setSubmitting] = useState(false);
   const { control, handleSubmit, formState: { errors } } = useForm<RegisterValues>({ resolver: zodResolver(registerSchema), defaultValues: { displayName: '', email: '', password: '' } });
   const submit = async (values: RegisterValues) => { setSubmitting(true); try { const result = await signUp(values.displayName, values.email, values.password); Alert.alert('Account created', result.needsEmailConfirmation ? 'Check your email to confirm your account, then sign in.' : 'Your account is ready.'); } catch (e) { Alert.alert('Could not create account', e instanceof Error ? e.message : 'Please try again.'); } finally { setSubmitting(false); } };
-  return <Screen contentContainerStyle={styles.content}>
+  return <Screen maxContentWidth={520} contentContainerStyle={styles.content}>
     <Text style={styles.eyebrow}>GET STARTED</Text><Text style={styles.heading}>Make room for together.</Text><Text style={styles.subheading}>Create your account. You can set up your private space next.</Text>
     <View style={styles.form}>
       <Controller control={control} name="displayName" render={({ field: { onChange, onBlur, value } }) => <FormField label="Your name" placeholder="How should we call you?" autoCapitalize="words" value={value} onChangeText={onChange} onBlur={onBlur} error={errors.displayName?.message} />} />
