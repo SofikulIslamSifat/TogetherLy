@@ -14,14 +14,17 @@ create table if not exists public.profiles (
 
 alter table public.profiles enable row level security;
 
+drop policy if exists "Profiles are readable by their owner" on public.profiles;
 create policy "Profiles are readable by their owner"
   on public.profiles for select to authenticated
   using ((select auth.uid()) = id);
 
+drop policy if exists "Profiles can be created by their owner" on public.profiles;
 create policy "Profiles can be created by their owner"
   on public.profiles for insert to authenticated
   with check ((select auth.uid()) = id);
 
+drop policy if exists "Profiles can be updated by their owner" on public.profiles;
 create policy "Profiles can be updated by their owner"
   on public.profiles for update to authenticated
   using ((select auth.uid()) = id)
@@ -37,10 +40,6 @@ begin
   return new;
 end;
 $$;
-
-create trigger profiles_set_updated_at
-before update on public.profiles
-for each row execute function private.set_updated_at();
 
 -- The trigger runs for newly registered Auth users. The display name is profile
 -- content only; it is never used as an authorization claim.
@@ -64,6 +63,12 @@ $$;
 revoke all on function private.handle_new_auth_user() from public, anon, authenticated;
 revoke all on function private.set_updated_at() from public, anon, authenticated;
 
+drop trigger if exists profiles_set_updated_at on public.profiles;
+create trigger profiles_set_updated_at
+before update on public.profiles
+for each row execute function private.set_updated_at();
+
+drop trigger if exists on_auth_user_created on auth.users;
 create trigger on_auth_user_created
   after insert on auth.users
   for each row execute function private.handle_new_auth_user();
@@ -76,19 +81,23 @@ on conflict (id) do update set
   file_size_limit = excluded.file_size_limit,
   allowed_mime_types = excluded.allowed_mime_types;
 
+drop policy if exists "Users can view their own avatar objects" on storage.objects;
 create policy "Users can view their own avatar objects"
   on storage.objects for select to authenticated
   using (bucket_id = 'private-avatars' and (storage.foldername(name))[1] = (select auth.uid())::text);
 
+drop policy if exists "Users can upload their own avatar objects" on storage.objects;
 create policy "Users can upload their own avatar objects"
   on storage.objects for insert to authenticated
   with check (bucket_id = 'private-avatars' and (storage.foldername(name))[1] = (select auth.uid())::text);
 
+drop policy if exists "Users can update their own avatar objects" on storage.objects;
 create policy "Users can update their own avatar objects"
   on storage.objects for update to authenticated
   using (bucket_id = 'private-avatars' and (storage.foldername(name))[1] = (select auth.uid())::text)
   with check (bucket_id = 'private-avatars' and (storage.foldername(name))[1] = (select auth.uid())::text);
 
+drop policy if exists "Users can delete their own avatar objects" on storage.objects;
 create policy "Users can delete their own avatar objects"
   on storage.objects for delete to authenticated
   using (bucket_id = 'private-avatars' and (storage.foldername(name))[1] = (select auth.uid())::text);
